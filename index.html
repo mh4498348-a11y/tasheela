@@ -1,0 +1,113 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تسهيلة</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--p:#1B6CA8;--d:#0B3954;--a:#F5A524;--bg:#F2F5FA;--t:#1B2733}
+*{-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:Cairo,system-ui,Tahoma,sans-serif;background:var(--bg);color:var(--t)}
+header{background:linear-gradient(135deg,var(--d),var(--p));color:#fff;padding:16px;display:flex;justify-content:space-between;align-items:center;font-size:24px;font-weight:800;box-shadow:0 2px 10px #0003}
+header button{background:#ffffff26;border:1px solid #ffffff80;color:#fff;font-size:14px;padding:6px 12px;margin:0;width:auto}
+main{max-width:640px;margin:auto;padding:16px}
+h3{color:var(--d);margin:18px 0 6px}
+input,select,textarea,button{width:100%;box-sizing:border-box;padding:13px;margin:5px 0;border-radius:14px;border:1.5px solid #D6DEE8;font:inherit;background:#fff;color:var(--t)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--p)}
+button{background:var(--p);color:#fff;border:0;font-weight:700;cursor:pointer;box-shadow:0 3px 8px #1B6CA833}
+button:active{transform:scale(.98)}button.alt{background:#fff;color:var(--p);border:1.5px solid var(--p);box-shadow:none}
+button.wa{background:#25D366;box-shadow:0 3px 8px #25D36655}
+.card{background:#fff;border-radius:18px;padding:14px;margin:8px 0;box-shadow:0 2px 10px #0B39541a}
+.card[onclick]{cursor:pointer;border-right:5px solid var(--a)}
+.ok{background:#E6F6EE;border-right:5px solid #22A06B}.no{background:#FFF1E6;border-right:5px solid var(--a)}
+.row{display:flex;gap:6px}.row>*{flex:1}.chips button{width:auto;margin:3px;padding:8px 14px;border-radius:22px}
+img.ph{width:110px;height:110px;object-fit:cover;border-radius:12px;margin:3px}
+#err{background:#FDECEC;color:#B42318;padding:10px;border-radius:12px;margin:8px 0;display:none}
+</style></head><body>
+<header>تسهيلة <button id="out" hidden onclick="sb.auth.signOut()">تسجيل الخروج</button></header><main><div id="err"></div><div id="app">جاري التحميل...</div></main>
+<script>
+window.onerror=(m)=>{const e=document.getElementById('err');e.style.display='block';e.textContent='حدث خطأ: '+m};
+window.onunhandledrejection=(e)=>window.onerror(e.reason&&e.reason.message||e.reason);
+if(!window.supabase){document.getElementById('app').innerHTML='<div class=card>تعذر تحميل الموقع. افتحه من الرابط على الإنترنت (وليس من معاينة الملف) وتأكد من اتصالك.</div>';throw new Error('no supabase lib')}
+const sb=supabase.createClient('https://qihjcipywqbhjcalorln.supabase.co','sb_publishable_0pGExRkQefVhKLk1SPZLTA_gQekWWsh');
+const $=s=>document.querySelector(s),go=h=>$('#app').innerHTML=h;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const kids=p=>S.locs.filter(l=>(l.parent_id||null)==p);
+const opts=(a,t)=>`<option value="">${t}</option>`+a.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+const cn=id=>(S.cats.find(c=>c.id==id)||{}).name||'',ln=id=>(S.locs.find(l=>l.id==id)||{}).name||'';
+let S={cats:[],locs:[]},me=null,P,A,R=[],reg=false,role='customer';
+async function boot(){
+ S.cats=(await sb.from('categories').select('*').eq('active',true).order('id')).data||[];
+ S.locs=(await sb.from('locations').select('*').order('id')).data||[];
+ const {data:{session}}=await sb.auth.getSession();route(session);
+ sb.auth.onAuthStateChange((_,s)=>route(s));}
+async function route(s){$('#out').hidden=!s;
+ if(!s){me=null;return auth()}
+ me=(await sb.from('profiles').select('*').eq('id',s.user.id).single()).data;
+ if(!me)return go('<p>جاري التحميل...</p>');
+ me.role=='customer'?customer():me.role=='admin'?admin('reports'):pro()}
+function auth(){go(`<h3>${reg?'إنشاء حساب جديد':'تسجيل الدخول'}</h3>
+${reg?`<input id=n placeholder="الاسم الكامل"><div class=row><button class="${role=='customer'?'':'alt'}" onclick="role='customer';auth()">عميل</button><button class="${role=='technician'?'':'alt'}" onclick="role='technician';auth()">فني</button><button class="${role=='engineer'?'':'alt'}" onclick="role='engineer';auth()">مهندس</button></div>`:''}
+<input id=e type=email placeholder="البريد الإلكتروني"><input id=p type=password placeholder="كلمة المرور (6 أحرف على الأقل)">
+<button onclick=doAuth()>${reg?'تسجيل':'دخول'}</button><button class=alt onclick="reg=!reg;auth()">${reg?'لدي حساب بالفعل':'ليس لدي حساب'}</button>`)}
+async function doAuth(){const email=$('#e').value.trim(),password=$('#p').value;if(!email||password.length<6)return alert('أدخل البريد وكلمة مرور لا تقل عن 6 أحرف');
+ const r=reg?await sb.auth.signUp({email,password,options:{data:{role,full_name:$('#n').value}}}):await sb.auth.signInWithPassword({email,password});
+ if(r.error)alert(r.error.message);else if(reg&&!r.data.session)alert('تحقق من بريدك الإلكتروني لتفعيل الحساب')}
+
+/* ---- العميل ---- */
+function customer(){go(`<h3>ما الخدمة التي تحتاجها؟</h3><select id=cat>${opts(S.cats,'كل الخدمات')}</select>
+<h3>موقعك</h3><select id=g onchange="$('#c').innerHTML=opts(kids(+this.value||-1),'المدينة');$('#a').innerHTML=opts([],'الحي')">${opts(kids(null),'المحافظة')}</select>
+<select id=c onchange="$('#a').innerHTML=opts(kids(+this.value||-1),'الحي')">${opts([],'المدينة')}</select><select id=a>${opts([],'الحي')}</select>
+<button onclick=find()>ابحث</button><div id=res></div>`)}
+async function find(){const area=+($('#a').value||$('#c').value||$('#g').value);if(!area)return alert('اختر المحافظة أولاً');
+ const {data,error}=await sb.rpc('search_pros',{cat:+$('#cat').value||null,area});if(error)return alert(error.message);
+ R=data||[];S.area=area;
+ $('#res').innerHTML=R.length?R.map((x,i)=>`<div class=card onclick=det(${i})><b>${esc(x.full_name||'بدون اسم')}</b><br>${x.role=='engineer'?'مهندس':'فني'} · ${esc(cn(x.category_id))} · ⭐ ${x.rating||'—'}</div>`).join(''):'<p>لا يوجد محترفون في هذه المنطقة حالياً</p>'}
+function det(i){const x=R[i];go(`<button class=alt onclick=customer()>رجوع</button><h3>${esc(x.full_name||'بدون اسم')}</h3>
+<p>${x.role=='engineer'?'مهندس':'فني'} · ${esc(cn(x.category_id))} · ⭐ ${x.rating||'—'}</p><p>${esc(x.bio)}</p>${x.qualifications?`<p><b>المؤهلات والمشاريع:</b> ${esc(x.qualifications)}</p>`:''}
+<div>${(x.photos||[]).map(u=>`<img class=ph src="${esc(u)}">`).join('')}</div>
+<textarea id=note placeholder="وصف طلبك (اختياري)"></textarea><button class=wa onclick=wa(${i})>تواصل عبر واتساب</button>
+<h3>قيّم هذا المحترف</h3><div class=row>${[1,2,3,4,5].map(n=>`<button class=alt onclick=rate(${i},${n})>⭐${n}</button>`).join('')}</div>`)}
+async function wa(i){const x=R[i],msg=`مرحباً ${x.full_name||''}، أحتاج ${cn(x.category_id)||'خدمة'} في ${ln(S.area)}. ${$('#note').value}`;
+ const {data,error}=await sb.rpc('log_request',{pro:x.user_id,area:S.area,msg});if(error||!data)return alert('هذا المحترف غير متاح حالياً');
+ let n=data.replace(/\D/g,'');if(n.startsWith('0'))n='2'+n;location.href=`https://wa.me/${n}?text=${encodeURIComponent(msg)}`}
+async function rate(i,s){const {error}=await sb.from('reviews').upsert({pro_id:R[i].user_id,customer_id:me.id,stars:s});alert(error?error.message:'شكراً لتقييمك')}
+
+/* ---- الفني / المهندس ---- */
+const tree=(p,d)=>kids(p).flatMap(l=>[`<label style="display:block;padding:4px ${d*18}px"><input type=checkbox style="width:auto" ${A.has(l.id)?'checked':''} onchange="this.checked?A.add(${l.id}):A.delete(${l.id})"> ${esc(l.name)}</label>`,...tree(l.id,d+1)]);
+async function pro(){const [p,a,st,pl]=await Promise.all([sb.from('pros').select('*').eq('user_id',me.id).single(),sb.from('pro_areas').select('location_id').eq('user_id',me.id),sb.rpc('my_status'),sb.from('plans').select('*').order('id')]);
+ P=p.data;A=new Set((a.data||[]).map(x=>x.location_id));const s=st.data,eng=me.role=='engineer';P.photos=P.photos||[];
+ go(`<div class="card ${s&&s.active?'ok':'no'}"><b>${s&&s.active?'حسابك ظاهر للعملاء ✅':'حسابك غير ظاهر للعملاء — يرجى الاشتراك'}</b><br>${s?`الفترة التجريبية حتى ${new Date(s.trial_ends).toLocaleDateString('ar-EG')} · الطلبات المستخدمة ${s.used} من ${s.limit}`:''}</div>
+<h3>الباقات (بالجنيه المصري)</h3>${(pl.data||[]).map(x=>`<div class=card>${esc(x.name)} — ${x.price_egp} ج.م / ${x.days} يوم${x.request_limit?` · ${x.request_limit} طلب`:' · طلبات غير محدودة'}<button onclick="sub(${x.id},'${esc(x.name)}',${x.price_egp})">اشترك</button></div>`).join('')}
+<h3>${eng?'ملفك المهني (مهندس)':'التخصص'}</h3><select id=pc onchange="P.category_id=+this.value">${opts(S.cats.filter(c=>c.kind==(eng?'engineer':'technician')),'اختر')}</select>
+<input placeholder="رقم واتساب (مثال 01012345678)" value="${esc(P.whatsapp)}" oninput="P.whatsapp=this.value"><textarea placeholder="نبذة عنك" oninput="P.bio=this.value">${esc(P.bio)}</textarea>
+${eng?`<textarea placeholder="المؤهلات والمشاريع السابقة وخدمات التشطيب والإشراف" oninput="P.qualifications=this.value">${esc(P.qualifications)}</textarea>`:''}
+<h3>صور أعمالك (اضغط على الصورة لحذفها)</h3><div id=ph></div><input type=file accept="image/*" onchange=up(this)>
+<h3>مناطق الخدمة (اختر أكثر من منطقة)</h3><div class=card>${tree(null,0).join('')}</div><button onclick=save()>حفظ الملف</button>`);
+ $('#pc').value=P.category_id||'';drawPh()}
+const drawPh=()=>$('#ph').innerHTML=P.photos.map((u,i)=>`<img class=ph src="${esc(u)}" onclick="P.photos.splice(${i},1);drawPh()">`).join('');
+async function up(el){const f=el.files[0];if(!f)return;const path=`${me.id}/${Date.now()}.jpg`;
+ const {error}=await sb.storage.from('work').upload(path,f,{contentType:f.type});if(error)return alert(error.message);
+ P.photos.push(sb.storage.from('work').getPublicUrl(path).data.publicUrl);drawPh();el.value=''}
+async function save(){if(!A.size||!P.category_id||!P.whatsapp)return alert('اختر التخصص ورقم واتساب ومنطقة خدمة واحدة على الأقل');
+ const u=await sb.from('pros').update({category_id:P.category_id,bio:P.bio,qualifications:P.qualifications,whatsapp:P.whatsapp,photos:P.photos}).eq('user_id',me.id);
+ await sb.from('pro_areas').delete().eq('user_id',me.id);
+ const i=await sb.from('pro_areas').insert([...A].map(l=>({user_id:me.id,location_id:l})));alert(u.error||i.error?'حدث خطأ':'تم الحفظ');pro()}
+async function sub(id,name,price){if(!confirm(`هل توافق على طلب الاشتراك في باقة "${name}" بسعر ${price} جنيه؟\nلن يتم خصم أي مبلغ تلقائياً؛ سيتواصل معك فريقنا لإتمام الدفع.`))return;
+ const {error}=await sb.from('subscriptions').insert({plan_id:id,consented_at:new Date().toISOString()});alert(error?error.message:'تم إرسال طلبك، سيتم التفعيل بعد تأكيد الدفع')}
+
+/* ---- المدير ---- */
+async function admin(t){const tabs=[['reports','التقارير'],['users','المستخدمون'],['subs','الاشتراكات'],['plans','الأسعار']];
+ let b='';
+ if(t=='reports'){const c=async q=>(await q).count,h=(x)=>sb.from(x).select('*',{count:'exact',head:true});
+  const r=[['العملاء',await c(h('profiles').eq('role','customer'))],['الفنيون',await c(h('profiles').eq('role','technician'))],['المهندسون',await c(h('profiles').eq('role','engineer'))],['إجمالي الطلبات',await c(h('requests'))],['اشتراكات مفعّلة',await c(h('subscriptions').eq('status','active'))]];
+  b=r.map(([k,v])=>`<div class=card>${k}: <b>${v}</b></div>`).join('')}
+ if(t=='users'){const d=(await sb.from('profiles').select('id,role,full_name,pros(banned)').neq('role','admin').order('created_at',{ascending:false})).data||[];
+  b=d.map(u=>`<div class=card>${esc(u.full_name||'بدون اسم')} · ${u.role}${u.pros?`<button class=alt onclick="act(sb.rpc('admin_ban',{uid:'${u.id}',b:${!u.pros.banned}}),'users')">${u.pros.banned?'إلغاء الحظر':'حظر'}</button>`:''}</div>`).join('')}
+ if(t=='subs'){const d=(await sb.from('subscriptions').select('*,plans(name,price_egp)').order('id',{ascending:false})).data||[];
+  b=d.map(x=>`<div class=card>${esc(x.plans&&x.plans.name)} (${x.plans&&x.plans.price_egp} ج.م) · ${x.status}${x.status=='pending'?`<div class=row><button onclick="act(sb.rpc('admin_decide',{sid:${x.id},ok:true}),'subs')">تفعيل بعد الدفع</button><button class=alt onclick="act(sb.rpc('admin_decide',{sid:${x.id},ok:false}),'subs')">رفض</button></div>`:''}</div>`).join('')}
+ if(t=='plans'){const d=(await sb.from('plans').select('*').order('id')).data||[];
+  b=d.map(p=>`<div class=card>${esc(p.name)} · ${p.days} يوم<input type=number value="${p.price_egp}" onchange="act(sb.from('plans').update({price_egp:+this.value}).eq('id',${p.id}),'plans')"></div>`).join('')+
+  `<h3>باقة جديدة</h3><input id=pn placeholder="الاسم"><input id=pp type=number placeholder="السعر ج.م"><input id=pd type=number placeholder="المدة بالأيام"><input id=pl type=number placeholder="حد الطلبات (فارغ = بلا حد)">
+  <button onclick="act(sb.from('plans').insert({name:$('#pn').value,price_egp:+$('#pp').value,days:+$('#pd').value||30,request_limit:$('#pl').value?+$('#pl').value:null}),'plans')">إضافة</button>`}
+ go(`<div class="row chips">${tabs.map(([k,n])=>`<button class="${k==t?'':'alt'}" onclick="admin('${k}')">${n}</button>`).join('')}</div>${b}`)}
+async function act(p,t){const {error}=await p;if(error)alert(error.message);admin(t)}
+boot();
+</script></body></html>
